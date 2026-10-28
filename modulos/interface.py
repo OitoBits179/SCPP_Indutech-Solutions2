@@ -147,6 +147,39 @@ def aplicar_tema(escolha):
 
 
 # ==========================================
+# JANELAS MAXIMIZADAS
+# ==========================================
+
+def maximizar_janela(janela_alvo, atraso=300):
+    """Abre a janela maximizada, mantendo a barra de título do Windows
+    com os botões de minimizar, maximizar/restaurar e fechar.
+
+    O estado é aplicado duas vezes: imediatamente e de novo após um curto
+    atraso, porque o CustomTkinter redefine o ícone e a barra de título logo
+    depois de criar a janela, o que pode desfazer a maximização.
+    """
+    def aplicar():
+        try:
+            if not janela_alvo.winfo_exists():
+                return
+            try:
+                janela_alvo.state("zoomed")              # Windows
+            except Exception:
+                janela_alvo.attributes("-zoomed", True)  # Linux (alternativa)
+        except Exception as erro:
+            print(f"Não foi possível maximizar a janela: {erro}")
+
+    aplicar()
+    janela_alvo.after(atraso, aplicar)
+
+
+def mostrar_janela_principal():
+    """Exibe a janela principal já maximizada."""
+    janela.deiconify()
+    maximizar_janela(janela)
+
+
+# ==========================================
 # INICIALIZAÇÃO
 # ==========================================
 
@@ -166,8 +199,10 @@ def iniciar():
     janela = ctk.CTk()
     aplicar_tema("Claro")
     janela.title("SCPP - Sistema de Controle de Pendências")
+    # Tamanho usado quando o usuário clicar em "restaurar" (sair do maximizado).
     janela.geometry("1100x680")
     janela.minsize(850, 550)
+    janela.resizable(True, True)
     janela.configure(fg_color=UI_FUNDO)
 
     # Menu lateral
@@ -296,6 +331,7 @@ def iniciar():
     mostrar_inicio()
 
     # Esconde a janela principal até o usuário entrar.
+    # Ela será exibida maximizada por mostrar_janela_principal().
     janela.withdraw()
     janela.after(200, abrir_login)
     janela.mainloop()
@@ -1081,7 +1117,7 @@ def entrar_funcionario(janela_login):
 
     janela_login.destroy()
     aplicar_tema(tema_atual)
-    janela.deiconify()
+    mostrar_janela_principal()
     mostrar_inicio()
 
 
@@ -1091,25 +1127,40 @@ def abrir_tela_senha(janela_login):
     janela_senha = ctk.CTkToplevel(janela_login)
     janela_senha.configure(fg_color="#FFFFFF")
     janela_senha.title("Acesso do Responsável")
-    janela_senha.geometry("350x250")
-    janela_senha.resizable(False, False)
-    janela_senha.transient(janela_login)
+    janela_senha.geometry("350x250")  # tamanho ao restaurar a janela
+    janela_senha.resizable(True, True)
+
+    # Não usar transient: no Windows, janelas "transient" perdem os botões
+    # de minimizar e maximizar.
     janela_senha.grab_set()
 
-    ctk.CTkLabel(
+    # Abre maximizada, com minimizar, maximizar e fechar.
+    maximizar_janela(janela_senha)
+
+    # Caixa centralizada para o formulário não esticar na tela inteira.
+    caixa = ctk.CTkFrame(
         janela_senha,
+        width=380,
+        height=300,
+        fg_color="transparent"
+    )
+    caixa.pack_propagate(False)
+    caixa.place(relx=0.5, rely=0.5, anchor="center")
+
+    ctk.CTkLabel(
+        caixa,
         text="Acesso do Responsável",
         font=("Arial", 19, "bold"),
         text_color=UI_TITULO
     ).pack(pady=(25, 15))
 
     ctk.CTkLabel(
-        janela_senha,
+        caixa,
         text="Digite a senha para continuar:"
     ).pack(pady=5)
 
     entrada_senha = ctk.CTkEntry(
-        janela_senha,
+        caixa,
         placeholder_text="Senha",
         show="*",
         height=38
@@ -1136,16 +1187,18 @@ def abrir_tela_senha(janela_login):
         janela_senha.destroy()
         janela_login.destroy()
         aplicar_tema(tema_atual)
-        janela.deiconify()
+        mostrar_janela_principal()
         mostrar_inicio()
 
     def voltar():
         janela_senha.destroy()
         janela_login.deiconify()
         janela_login.grab_set()
+        # Garante que o login volte maximizado após ser reexibido.
+        maximizar_janela(janela_login, atraso=150)
 
     ctk.CTkButton(
-        janela_senha,
+        caixa,
         text="Entrar",
         command=confirmar,
         height=38,
@@ -1153,7 +1206,7 @@ def abrir_tela_senha(janela_login):
     ).pack(fill="x", padx=25, pady=(5, 8))
 
     ctk.CTkButton(
-        janela_senha,
+        caixa,
         text="Voltar",
         command=voltar,
         height=34,
@@ -1176,24 +1229,17 @@ def abrir_login():
     janela_login_ativa = janela_login
     janela_login.configure(fg_color="#FFFFFF")
     janela_login.title("Login - SCPP")
+    janela_login.geometry("900x650")  # tamanho ao restaurar a janela
     janela_login.resizable(True, True)
 
-    # Não usar transient aqui: em alguns ambientes isso pode atrapalhar
-    # a janela filha ao ocupar corretamente a tela inteira.
+    # Não usar transient aqui: no Windows isso remove os botões de
+    # minimizar/maximizar e pode atrapalhar a maximização da janela.
     janela_login.grab_set()
     janela_login.protocol("WM_DELETE_WINDOW", janela.destroy)
 
-    # Ativa o modo de tela cheia depois que o Windows cria a janela.
-    janela_login.after(
-        300,
-        lambda: janela_login.attributes("-fullscreen", True)
-    )
-
-    # ESC sai do modo de tela cheia durante os testes.
-    janela_login.bind(
-        "<Escape>",
-        lambda evento: janela_login.attributes("-fullscreen", False)
-    )
+    # Abre maximizada (não em "fullscreen"), mantendo a barra de título com
+    # os botões de minimizar, maximizar/restaurar e fechar.
+    maximizar_janela(janela_login)
 
     ctk.CTkLabel(
         janela_login,
